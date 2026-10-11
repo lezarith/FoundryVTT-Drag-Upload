@@ -8,8 +8,8 @@ Hooks.once('init', async () => {
         type: String,
         default: usingTheForge ? "forgevtt" : "data",
         choices: {
-          "data": game.i18n.localize("FILES.SourceUser"),
-          "s3": game.i18n.localize("FILES.SourceS3"),
+            "data": game.i18n.localize("FILES.SourceUser"),
+            "s3": game.i18n.localize("FILES.SourceS3"),
         },
         onChange: async () => { await initializeDragUpload(); }
     });
@@ -46,10 +46,8 @@ Hooks.once('init', async () => {
 });
 
 Hooks.once('ready', async function() {
-    // Setup variables and folders
     await initializeDragUpload();
 
-    // Enable binding
     new DragDrop({
         callbacks: {
             drop: handleDrop
@@ -63,10 +61,9 @@ async function initializeDragUpload() {
         await createFoldersIfMissing();
     }
 
-    //const targetBucket = game.settings.get("dragupload", "fileUploadBucket");
     let folderParts = [];
     const targetFolder = game.settings.get("dragupload", "fileUploadFolder");
-    folderParts = folderParts.concat(targetFolder.split("/")).filter(x => x!== "");
+    folderParts = folderParts.concat(targetFolder.split("/")).filter(x => x !== "");
 
     window.dragUpload = {};
     window.dragUpload.targetFolder = folderParts.join("/");
@@ -88,13 +85,11 @@ async function createFoldersIfMissing() {
 
 async function createFolderIfMissing(folderPath) {
     const source = game.settings.get("dragupload", "fileUploadSource");
-    try
-    {
+    try {
         let result = await FilePicker.browse(source, folderPath);
         if ( !result.dir.includes(folderPath) ) await FilePicker.createDirectory(source, folderPath, source === "s3" ? { bucket: game.settings.get("dragupload", "fileUploadBucket") } : {});
     }
-    catch (error)
-    {
+    catch (error) {
         try {
             await FilePicker.createDirectory(source, folderPath, source === "s3" ? {bucket: game.settings.get("dragupload", "fileUploadBucket")} : {});
         }
@@ -102,100 +97,65 @@ async function createFolderIfMissing(folderPath) {
     }
 }
 
-async function handlePlaylistDrop(event) {
-    event.preventDefault();
-    console.debug("Got handlePlaylistDrop event:");
-    console.debug(event);
-}
-
 async function handleDrop(event) {
     event.preventDefault();
-    console.debug("Got handleDrop event:");
-    console.debug(event);
 
     const files = event.dataTransfer.files;
-    console.debug("FileList is: ");
-    console.debug(files);
-
-    let file
+    let file;
     if (!files || files.length === 0) {
-        let url = event.dataTransfer.getData("Text")
+        let url = event.dataTransfer.getData("Text");
         if (!url) {
-            console.log("DragUpload | No Files detected, exiting");
-            // Let Foundry handle the event instead
             canvas._onDrop(event);
             return;
         }
-        // trimming query string
-        if (url.includes("?")) url = url.substr(0, url.indexOf("?"))
-        const splitUrl = url.split("/")
-        let filename = splitUrl[splitUrl.length - 1]
+        if (url.includes("?")) url = url.substr(0, url.indexOf("?"));
+        const splitUrl = url.split("/");
+        let filename = splitUrl[splitUrl.length - 1];
         if (!filename.includes(".")) {
-            console.log("DragUpload | Dragged non-file text:", url);
-            // Let Foundry handle the event instead
             canvas._onDrop(event);
-            return
+            return;
         }
-        const extension = filename.substr(filename.lastIndexOf(".") + 1)
-        const validExtensions =
-          Object.keys(CONST.IMAGE_FILE_EXTENSIONS)
-          .concat(Object.keys(CONST.VIDEO_FILE_EXTENSIONS))
-          .concat(Object.keys(CONST.AUDIO_FILE_EXTENSIONS));
+        const extension = filename.substr(filename.lastIndexOf(".") + 1);
+        const validExtensions = Object.keys(CONST.IMAGE_FILE_EXTENSIONS)
+            .concat(Object.keys(CONST.VIDEO_FILE_EXTENSIONS))
+            .concat(Object.keys(CONST.AUDIO_FILE_EXTENSIONS));
         if (!validExtensions.includes(extension)) {
-            console.log("DragUpload | Dragged file with bad extension:", url);
-            // Let Foundry handle the event instead
             canvas._onDrop(event);
-            return
+            return;
         }
-        // special case: chrome imgur drag from an album gives a low-res webp file instead of a PNG
         if (url.includes("imgur") && filename.endsWith("_d.webp")) {
-            filename = filename.substr(0, filename.length - "_d.webp".length) + ".png"
-            url = url.substr(0, url.length - "_d.webp".length) + ".png"
+            filename = filename.substr(0, filename.length - "_d.webp".length) + ".png";
+            url = url.substr(0, url.length - "_d.webp".length) + ".png";
         }
-        // must be a valid file URL!
-        file = {isExternalUrl: true, url: url, name: filename}
+        file = {isExternalUrl: true, url: url, name: filename};
     } else {
-        file = files[0]
+        file = files[0];
     }
 
-    // file.path won't be set if it's an image dragged from within foundry itself instead of dragged from the OS
     if (file == undefined) {
-        console.log("Drag Upload | No Files detected");
-
-        // Let Foundry handle the event instead
         canvas._onDrop(event);
         return;
     }
-    console.debug("file is: ");
-    console.debug(file);
 
     if (Object.keys(CONST.AUDIO_FILE_EXTENSIONS).filter(x => x != "webm" && file.name.endsWith(x)).length > 0) {
         await HandleAudioFile(event, file);
         return;
     }
 
-    const layer = game.canvas.activeLayer.name;
+    const layer = canvas.activeLayer?.constructor.name || "";
 
-    if (layer.includes("BackgroundLayer")) {
-        await CreateTile(event, file, false);
-    }
-    else if (layer.includes("ForegroundLayer")) {
+    if (layer.includes("ForegroundLayer")) {
         await CreateTile(event, file, true);
-    }
-    else if (layer.includes("TokenLayer")) {
+    } else if (layer.includes("TokenLayer")) {
         await CreateActor(event, file);
-    }
-    else if (layer.includes("NotesLayer")) {
+    } else if (layer.includes("NotesLayer")) {
         await CreateJournalPin(event, file);
-    }
-    else {
-        await CreateTile(event, file);
+    } else {
+        await CreateTile(event, file, false);
     }
 }
 
 async function HandleAudioFile(event, file) {
-    console.debug(file.name + " is an audio file");
-
     await CreateAmbientAudio(event, file);
 }
 
@@ -203,7 +163,7 @@ async function CreateAmbientAudio(event, file) {
     const source = game.settings.get("dragupload", "fileUploadSource");
     let response;
     if (file.isExternalUrl) {
-        response = {path: file.url}
+        response = {path: file.url};
     } else {
         response = await FilePicker.upload(source, window.dragUpload.targetFolder + "/ambient", file, source === "s3" ? {bucket: game.settings.get("dragupload", "fileUploadBucket")} : {});
     }
@@ -218,69 +178,47 @@ async function CreateAmbientAudio(event, file) {
     };
 
     convertXYtoCanvas(data, event);
-
     canvas.sounds.activate();
     await canvas.scene.createEmbeddedDocuments("AmbientSound", [data]);
 }
 
 async function CreateTile(event, file, overhead) {
     const source = game.settings.get("dragupload", "fileUploadSource");
-    let response
+    let response;
     if (file.isExternalUrl) {
-        response = {path: file.url}
+        response = {path: file.url};
     } else {
         response = await FilePicker.upload(source, window.dragUpload.targetFolder + "/tiles", file, source === "s3" ? {bucket: game.settings.get("dragupload", "fileUploadBucket")} : {});
     }
 
     const data = CreateImgData(event, response);
-
     const tex = await loadTexture(data.img);
     const ratio = canvas.dimensions.size / (data.tileSize || canvas.dimensions.size);
-    data.texture = {
-        src: data.img
-    }
-    data.width = tex.baseTexture.width * ratio;
-    data.height = tex.baseTexture.height * ratio;
+    
+    data.texture = { src: data.img };
+    // Updated for PIXI v7/v8 texture property handling
+    data.width = (tex.width || tex.baseTexture?.width || 100) * ratio;
+    data.height = (tex.height || tex.baseTexture?.height || 100) * ratio;
     data.overhead = overhead;
 
-    // Optionally snap to grid
     data.x = data.x - (data.width / 2);
     data.y = data.y - (data.height / 2);
     if ( !event.shiftKey ) foundry.utils.mergeObject(data, canvas.grid.getSnappedPosition(data.x, data.y, 1));
 
-    // Create the tile as hidden if the ALT key is pressed
     if ( event.altKey ) data.hidden = true;
 
-    // Activate Tile layer (if not already active)
-    if ( game.release?.generation <= 9 ) {
-        if (overhead) {
-            canvas.foreground.activate();
-        }
-        else {
-            canvas.background.activate();
-        }
-    }
-    else {
-        if ( overhead ) {
-            ui.controls.controls.find(c => c.name === "tiles").foreground = true;
-        } else {
-            ui.controls.controls.find(c => c.name === "tiles").foreground = false;
-        }
-        canvas.perception.update({refreshLighting: true, refreshTiles: true}, true);
-    }
+    canvas.tiles.activate();
     return canvas.scene.createEmbeddedDocuments('Tile', [data], {});
 }
 
 async function CreateJournalPin(event, file) {
     const source = game.settings.get("dragupload", "fileUploadSource");
-    let response
+    let response;
     if (file.isExternalUrl) {
-        response = {path: file.url}
+        response = {path: file.url};
     } else {
         response = await FilePicker.upload(source, window.dragUpload.targetFolder + "/journals", file, source === "s3" ? {bucket: game.settings.get("dragupload", "fileUploadBucket")} : {});
     }
-    console.debug("Got response: ");
-    console.debug(response);
 
     const data = {
         name: file.name,
@@ -288,9 +226,6 @@ async function CreateJournalPin(event, file) {
     };
 
     const journal = await JournalEntry.create(data);
-    console.debug("Created journal entry: ");
-    console.debug(journal);
-
     const pinData = {
         entryId: journal.id,
         icon: "icons/svg/book.svg",
@@ -301,22 +236,18 @@ async function CreateJournalPin(event, file) {
     };
 
     convertXYtoCanvas(pinData, event);
-
-    // Activate Notes layer (if not already active)
     canvas.notes.activate();
     return canvas.scene.createEmbeddedDocuments('Note', [pinData], {});
 }
 
 async function CreateActor(event, file) {
     const source = game.settings.get("dragupload", "fileUploadSource");
-    let response
+    let response;
     if (file.isExternalUrl) {
-        response = {path: file.url}
+        response = {path: file.url};
     } else {
         response = await FilePicker.upload(source, window.dragUpload.targetFolder + "/tokens", file, source === "s3" ? {bucket: game.settings.get("dragupload", "fileUploadBucket")} : {});
     }
-    console.debug("Got response: ");
-    console.debug(response);
 
     const data = CreateImgData(event, response);
     data.name = file.name;
@@ -326,44 +257,38 @@ async function CreateActor(event, file) {
         data.img = "";
     }
 
-    // Ensure the user has permission to drop the actor and create a Token
     if ( !game.user.can("TOKEN_CREATE") ) {
         return ui.notifications.warn(`You do not have permission to create new Tokens!`);
-      }
+    }
 
     const types = Object.keys(CONFIG.Actor.sheetClasses);
-    types.push("actorless")
+    types.push("actorless");
 
-      if (types.length > 1) {
+    if (types.length > 1) {
         let d = new Dialog({
             title: "What Type should this Actor be created as?",
             buttons: {},
             default: types[0],
             close: () => {}
-           });
-           console.debug("Creating dialog: ");
-           console.debug(d);
+        });
 
-           types.forEach(x => {
+        types.forEach(x => {
             d.data.buttons[x] = {
                 label: x,
                 callback: async () => await CreateActorWithType(event, data, tokenData, x)
-               }
-           });
+            };
+        });
 
-           d.render(true);
-      }
-      else {
+        d.render(true);
+    } else {
         await CreateActorWithType(event, data, tokenData, types[0]);
-      }
-
-
+    }
 }
 
 async function CreateActorWithType(event, data, tokenImageData, type) {
-    let createdType = type
+    let createdType = type;
     if (type === "actorless") {
-        createdType = Object.keys(CONFIG.Actor.sheetClasses)[0]
+        createdType = Object.keys(CONFIG.Actor.sheetClasses)[0];
     }
 
     let actorName = data.name;
@@ -371,40 +296,27 @@ async function CreateActorWithType(event, data, tokenImageData, type) {
         actorName = actorName.split(".")[0];
     }
 
-    const actor = await getDocumentClass("Actor").create(
-    {
+    const actor = await getDocumentClass("Actor").create({
         name: actorName,
         type: createdType,
         img: data.img
     });
 
-    let prototypeToken;
-    let actorId;
-    if (game.release?.generation <= 9) {
-        prototypeToken = actor.data.token;
-        actorId = actor.data._id;
-    } else {
-        prototypeToken = actor.prototypeToken;
-        actorId = actor._id;
-    }
+    const prototypeToken = actor.prototypeToken;
+    const actorId = actor._id;
 
-    // Prepare Token data specific to this placement
     const hg = canvas.dimensions.size / 2;
     data.x -= (prototypeToken.width * hg);
     data.y -= (prototypeToken.height * hg);
 
     let tokenData = { x: data.x, y: data.y, hidden: event.altKey, img: tokenImageData.img };
 
-    // Snap the dropped position and validate that it is in-bounds
     if ( !event.shiftKey ) foundry.utils.mergeObject(tokenData, canvas.grid.getSnappedPosition(data.x, data.y, 1));
-    if ( game.release?.generation <= 9 && !canvas.grid.hitArea.contains(tokenData.x, tokenData.y) ) return false;
-    if ( game.release?.generation > 9 ) {
-        const d = canvas.dimensions;
-        tokenData.x = Math.clamped(tokenData.x, 0, d.width-1);
-        tokenData.y = Math.clamped(tokenData.y, 0, d.height-1);
-    }
+    
+    const d = canvas.dimensions;
+    tokenData.x = Math.clamped(tokenData.x, 0, d.width-1);
+    tokenData.y = Math.clamped(tokenData.y, 0, d.height-1);
 
-    // Get the Token image
     if ( prototypeToken.randomImg ) {
         let images = await actor.getTokenImages();
         images = images.filter(i => (images.length === 1) || !(i === this._lastWildcard));
@@ -412,16 +324,13 @@ async function CreateActorWithType(event, data, tokenImageData, type) {
         tokenData.img = this._lastWildcard = image;
     }
 
-    // Merge Token data with the default for the Actor
     tokenData = foundry.utils.mergeObject(foundry.utils.duplicate(prototypeToken), tokenData, {inplace: true});
     tokenData.actorId = actorId;
     tokenData.actorLink = true;
 
-    // Submit the Token creation request and activate the Tokens layer (if not already active)
-    canvas.getLayerByEmbeddedName("Token").activate();
+    canvas.tokens.activate();
     await canvas.scene.createEmbeddedDocuments('Token', [tokenData], {});
 
-    // delete actor if it's actorless
     if (type === "actorless") {
         actor.delete();
     }
@@ -431,22 +340,15 @@ function CreateImgData(event, response) {
     const data = {
         img: response.path
     };
-
     convertXYtoCanvas(data, event);
-
     return data;
 }
 
 function convertXYtoCanvas(data, event) {
-
-    // Acquire the cursor position transformed to Canvas coordinates
     const [x, y] = [event.clientX, event.clientY];
     const t = canvas.stage.worldTransform;
     data.x = (x - t.tx) / canvas.stage.scale.x;
     data.y = (y - t.ty) / canvas.stage.scale.y;
 
-    // Allow other modules to overwrite this, such as Isometric
     Hooks.callAll("dragDropPositioning", { event: event, data: data });
-    console.debug("Converted x/y values to canvas: ");
-    console.debug(data);
 }
