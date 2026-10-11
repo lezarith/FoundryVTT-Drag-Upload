@@ -6,9 +6,9 @@
   "version": "2.3.1",
   "compatibility": {
     "minimum": "11",
-    "verified": "12",
-    "maximum": "13"
-  },
+    "verified": "14",
+    "maximum": "14"
+   }
   "author": "Cody Swendrowski <cody@swendrowski.us>",
   "authors": [
     { "name": "Cody Swendrowski <cody@swendrowski.us>" },
